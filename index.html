@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>お試しレジごっこ</title>
+  <title>音が出るレジごっこ</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
     body {
@@ -55,7 +55,7 @@
 </head>
 <body>
 
-  <h1>🍞 おみせやさんレジ（おためし版） 🍎</h1>
+  <h1>🍞 おみせやさんレジ（おためし音が出る版） 🍎</h1>
   
   <div id="preview-container">
     <video id="video" autoplay playsinline></video>
@@ -73,7 +73,7 @@
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
-    // お試し用の商品リスト（ランダムで出ます）
+    // お試し用の商品リスト
     const dummyProducts = [
       { name: "りんご", price: 120 },
       { name: "バナナ", price: 150 },
@@ -85,6 +85,9 @@
     ];
 
     function startCamera() {
+      // 最初にお音を出すための「許可」をスマホからもらうダミー音声を一瞬鳴らす
+      playVoice("レジスタート");
+
       const constraints = {
         video: { facingMode: { ideal: 'environment' } },
         audio: false
@@ -94,10 +97,7 @@
         .then(stream => { successStream(stream); })
         .catch(err => {
           navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-            .then(stream => { successStream(stream); })
-            .catch(finalErr => {
-              alert('カメラが起動できません。');
-            });
+            .then(stream => { successStream(stream); });
         });
     }
 
@@ -127,33 +127,37 @@
         if (code) {
           isScanning = false;
           
-          // ランダムに商品を選ぶ
           const randomProduct = dummyProducts[Math.floor(Math.random() * dummyProducts.length)];
           
-          const speakText = `${randomProduct.name}、${randomProduct.price}円！`;
+          // 画面書き換え
           resultDiv.innerHTML = `<span style="color:#ff6b6b;">${randomProduct.name}</span><br>${randomProduct.price}円`;
           
-          speak(speakText);
+          // 音声を再生
+          const text = `${randomProduct.name}、${randomProduct.price}えん`;
+          playVoice(text);
         }
       }
       requestAnimationFrame(tick);
     }
 
-    function speak(text) {
-      window.speechSynthesis.cancel();
+    // Googleの音声データを使って直接音楽として再生する関数
+    function playVoice(text) {
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ja&client=tw-ob`;
+      const audio = new Audio(audioUrl);
       
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'ja-JP';
-      utterance.rate = 1.1;
-
-      utterance.onend = function() {
-        setTimeout(() => {
-          resultDiv.innerHTML = "つぎのQRコードを<br>うつしてね！";
-          isScanning = true;
-        }, 1500); // 1.5秒後に次のスキャンを受け付ける
-      };
-
-      window.speechSynthesis.speak(utterance);
+      audio.play().then(() => {
+        // 音声が終わったら次のスキャンへ
+        audio.onended = function() {
+          setTimeout(() => {
+            resultDiv.innerHTML = "つぎのQRコードを<br>うつしてね！";
+            isScanning = true;
+          }, 1000);
+        };
+      }).catch(err => {
+        console.error("再生失敗:", err);
+        // 万が一エラーでも次へ進める
+        setTimeout(() => { isScanning = true; }, 2000);
+      });
     }
   </script>
 </body>
