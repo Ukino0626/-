@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>レジごっこ</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background-color: #f7f9fa;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #ff6b6b;
+      font-size: 24px;
+    }
+    #preview-container {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      margin: 0 auto;
+      border: 4px solid #ffcbd1;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+    }
+    video {
+      width: 100%;
+      display: block;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 28px;
+      font-weight: bold;
+      color: #333;
+      min-height: 80px;
+    }
+    .btn {
+      background-color: #ff6b6b;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 18px;
+      border-radius: 25px;
+      cursor: pointer;
+      margin-top: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .btn:active {
+      transform: translateY(2px);
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🍞 おみせやさんレジ 🍎</h1>
+  
+  <div id="preview-container">
+    <video id="video" autoplay playsinline></video>
+  </div>
+
+  <div id="result">QRコードを<br>うつしてね！</div>
+  
+  <button class="btn" onclick="startCamera()">カメラをスタート</button>
+
+  <script>
+    const video = document.getElementById('video');
+    const resultDiv = document.getElementById('result');
+    let isScanning = false;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // カメラ起動（エラー対策強化版）
+    function startCamera() {
+      const constraints = {
+        video: {
+          facingMode: { ideal: 'environment' }
+        },
+        audio: false
+      };
+
+      navigator.mediaDevices.getUserMedia(constraints)
+        .then(stream => {
+          successStream(stream);
+        })
+        .catch(err => {
+          console.warn('背面カメラ失敗、別カメラを試します', err);
+          navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+            .then(stream => {
+              successStream(stream);
+            })
+            .catch(finalErr => {
+              alert('カメラが起動できません。設定を確認してください。');
+              console.error(finalErr);
+            });
+        });
+    }
+
+    function successStream(stream) {
+      video.srcObject = stream;
+      video.setAttribute('playsinline', true);
+      
+      video.onloadedmetadata = function(e) {
+        video.play().then(() => {
+          isScanning = true;
+          requestAnimationFrame(tick);
+        }).catch(pErr => {
+          console.error("再生エラー:", pErr);
+        });
+      };
+    }
+
+    function tick() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA && isScanning) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'dontInvert',
+        });
+
+        if (code) {
+          isScanning = false;
+          const qrData = code.data;
+          
+          resultDiv.innerHTML = "さがしています...";
+
+          // スプレッドシート側の呼び出し
+          google.script.run
+            .withSuccessHandler(function(product) {
+              if (product) {
+                const speakText = `${product.name}、${product.price}円！`;
+                resultDiv.innerHTML = `<span style="color:#ff6b6b;">${product.name}</span><br>${product.price}円`;
+                speak(speakText);
+              } else {
+                resultDiv.innerHTML = "みつかりませんでした";
+                speak("あれれ？みつからないよ");
+                setTimeout(() => { isScanning = true; }, 2000);
+              }
+            })
+            .withFailureHandler(function(err) {
+              resultDiv.innerHTML = "通信エラーが発生しました";
+              setTimeout(() => { isScanning = true; }, 2000);
+            })
+            .getProduct(qrData);
+        }
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function speak(text) {
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'ja-JP';
+      utterance.rate = 1.1;
+
+      utterance.onend = function() {
+        setTimeout(() => {
+          resultDiv.innerHTML = "つぎのQRコードを<br>うつしてね！";
+          isScanning = true;
+        }, 1000);
+      };
+
+      window.speechSynthesis.speak(utterance);
+    }
+  </script>
+</body>
+</html>
