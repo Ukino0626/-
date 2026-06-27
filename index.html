@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>レジごっこ (GitHub版)</title>
+  <title>レジごっこ (JSONデータ版)</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
     body { font-family: sans-serif; text-align: center; background-color: #f7f9fa; margin: 0; padding: 20px; }
@@ -15,43 +15,29 @@
 </head>
 <body>
 
-  <h1>🍞 おみせやさんレジ (GitHub版) 🍎</h1>
+  <h1>🍞 おみせやさんレジ 🍎</h1>
   
   <div id="preview-container">
     <video id="video" autoplay playsinline></video>
   </div>
 
-  <div id="result">QRコードを<br>うつしてね！</div>
+  <div id="result">QRコードを<br>ううつしてね！</div>
   <button class="btn" onclick="initAndStart()">カメラをスタート</button>
 
   <script>
     const video = document.getElementById('video');
     const resultDiv = document.getElementById('result');
     let isScanning = false;
-    let productSheetsData = []; // スプシから取得したデータをここに保存します
+    let productSheetsData = []; // ここにJSONから読み込んだデータを入れます
 
-    // ⚠️ここに「ステップ1」でコピーした .csv のURLを貼り付けてください！
-    const SPREADSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQf2gvrySKODbDNfUtStrIrOPtbzcMNWgOlNc06L321A6htOHQpzPi5dW-tgrML0JVll6UMLpdJHUWW/pub?gid=0&single=true&output=csv";
-
-    // 画面が開いた瞬間に、バックグラウンドでスプシのデータを読み込みます
-    async function loadSpreadsheetData() {
+    // 🌐 ページが開いた瞬間に、同じフォルダにある products.json を読み込む
+    async function loadJsonData() {
       try {
-        const response = await fetch(SPREADSHEET_CSV_URL);
-        const csvText = await response.text();
-        
-        // CSVデータを扱いやすいように分解して保存
-        const rows = csvText.split("\n").map(row => row.split(","));
-        // 1行目はヘッダー(ID, 商品, 金額)なので、2行目以降をループ
-        productSheetsData = rows.slice(1).map(row => {
-          return {
-            id: row[0]?.trim(),
-            name: row[1]?.trim(),
-            price: row[2]?.trim()
-          };
-        });
+        const response = await fetch('./products.json'); // 同じ場所のJSONファイルを指定
+        productSheetsData = await response.json();
         console.log("データの読み込みが完了しました！", productSheetsData);
       } catch (error) {
-        console.error("スプシの読み込みに失敗しました:", error);
+        console.error("JSONファイルの読み込みに失敗しました:", error);
       }
     }
 
@@ -87,7 +73,7 @@
           const qrData = code.data.trim();
           resultDiv.innerHTML = "さがしています...";
 
-          // ★GASを使わず、事前に読み込んだデータ(配列)からQRのIDを探す処理
+          // JSONから読み込んだデータの中から、QRのIDを探す
           const product = productSheetsData.find(p => p.id === qrData);
 
           if (product) {
@@ -118,8 +104,8 @@
       }
     }
 
-    // ページが開いたらすぐにスプシのデータを裏で読み込む
-    window.onload = loadSpreadsheetData;
+    // 画面が開いたらすぐデータ読み込みを実行
+    window.onload = loadJsonData;
   </script>
 </body>
 </html>
