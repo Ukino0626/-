@@ -2,103 +2,105 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>レジごっこ (巨大ボタン版)</title>
+  <title>レジごっこ (巨大丸ボタン版)</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
-    /* 画面全体の配置をスマホに最適化 */
     html, body {
       height: 100%;
       margin: 0;
       padding: 0;
       background-color: #f7f9fa;
       font-family: sans-serif;
-      overflow: hidden; /* スクロールを禁止してレジ画面を固定 */
+      overflow: hidden; /* 画面を固定してスクロールを防止 */
     }
     
-    /* 上半分のコンテンツエリア */
+    /* 📺 上半分：カメラ画面 */
     .top-container {
       height: 50%;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      box-sizing: border-box;
-      padding: 10px;
-    }
-
-    h1 { 
-      color: #ff6b6b; 
-      font-size: 22px; 
-      margin: 0 0 10px 0; 
-    }
-    
-    #preview-container { 
-      position: relative; 
-      width: 90%; 
-      max-width: 500px; 
-      height: 65%; /* 上半分のスペースに収まるよう調整 */
-      border: 5px solid #ffcbd1; 
-      border-radius: 12px; 
-      overflow: hidden; 
+      width: 100%;
       background: #000;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      position: relative;
     }
     video { 
       width: 100%; 
       height: 100%; 
-      object-fit: cover; /* 枠いっぱいにカメラ映像を広げる */
+      object-fit: cover; 
     }
     
-    /* 🍏 結果表示エリア（ボタンが消えた後はここが下半分に広がります） */
-    #result { 
+    /* 🍏 下半分：結果表示エリア（丸ボタンの背景になります） */
+    .bottom-container {
       height: 50%;
+      width: 100%;
+      position: relative;
+      background-color: #ffffff;
+      border-top: 4px solid #ffcbd1;
+      box-sizing: border-box;
+    }
+
+    #result { 
+      width: 100%;
+      height: 100%;
       display: flex;
       justify-content: center;
       align-items: center;
-      font-size: 32px; 
       font-weight: bold; 
       color: #333; 
-      background-color: #ffffff;
-      border-top: 2px dashed #ffcbd1;
-      box-sizing: border-box;
-      padding: 20px;
       text-align: center;
+      box-sizing: border-box;
+      padding: 10px;
+      font-size: 48px; 
+      line-height: 1.4;
     }
 
-    /* 🚨【ここが主役】下半分をすべて埋め尽くす巨大ボタン */
-    .huge-btn {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 50%; /* 画面の下半分ぴったり（50%） */
+    /* 🔴【ここが主役】下半分の高さに合わせた巨大丸ボタン */
+    .huge-circle-btn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%); /* 画面の真ん中にぴったり配置 */
+      
+      /* 下半分の高さ（50vh）から、上下の少しの余白を引いたサイズ（44vh）で綺麗な正円を作ります */
+      width: 44vh;
+      height: 44vh;
+      max-width: 85vw;  /* 横幅が狭いスマホでも画面からはみ出さないためのセーフティ */
+      max-height: 85vw;
+      
+      border-radius: 50%; /* これで綺麗な丸になります */
       background-color: #ff6b6b; 
       color: white; 
       border: none; 
       font-size: 28px; 
       font-weight: bold;
       cursor: pointer; 
-      box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
-      z-index: 100; /* 一番手前に表示 */
-      transition: background-color 0.2s;
+      box-shadow: 0 8px 20px rgba(255, 107, 107, 0.4); /* ボタンが立体的に見える影 */
+      z-index: 100; 
+      transition: all 0.1s ease;
+      
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      line-height: 1.3;
     }
-    .huge-btn:active {
-      background-color: #fa5252; /* タップした瞬間に少し色が変わる */
+    
+    /* ボタンを押したときのぷにっとしたアニメーション */
+    .huge-circle-btn:active {
+      background-color: #fa5252; 
+      transform: translate(-50%, -46%) scale(0.95); /* ちょっと沈むような動き */
+      box-shadow: 0 4px 10px rgba(255, 107, 107, 0.2);
     }
   </style>
 </head>
 <body>
 
   <div class="top-container">
-    <h1>🍞 おみせやさんレジ 🍎</h1>
-    <div id="preview-container">
-      <video id="video" autoplay playsinline></video>
-    </div>
+    <video id="video" autoplay playsinline></video>
   </div>
 
-  <div id="result">下のボタンを<br>おしてね！</div>
-
-  <button id="start-btn" class="huge-btn" onclick="initAndStart()">ここをおして<br>カメラをスタート！</button>
+  <div class="bottom-container">
+    <div id="result">QRコードを<br>うつしてね！</div>
+    
+    <button id="start-btn" class="huge-circle-btn" onclick="initAndStart()">ここをおして<br>スタート！</button>
+  </div>
 
   <script {nonce}>
     const video = document.getElementById('video');
@@ -121,9 +123,8 @@
         window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
       }
       
-      // 🌟 ボタンをパッと消して、下半分を「結果表示（スキャン待ち）」エリアにする
+      // ボタンを消してスキャン待ちにする
       startBtn.style.display = 'none';
-      resultDiv.innerHTML = "QRコードを<br>うつしてね！";
       
       startCamera();
     }
@@ -158,16 +159,16 @@
         if (code) {
           isScanning = false;
           const qrData = code.data.trim();
-          resultDiv.innerHTML = "さがしています...";
+          resultDiv.innerHTML = "<span style='font-size: 36px; color: #999;'>さがしています...</span>";
 
           const product = productSheetsData.find(p => p.id === qrData);
 
           if (product) {
             const speakText = `${product.name}、${product.price}円！`;
-            resultDiv.innerHTML = `<span style="color:#ff6b6b; font-size: 38px;">${product.name}</span><br><br><span style="font-size: 45px; color: #333;">${product.price}円</span>`;
+            resultDiv.innerHTML = `<div style="width: 100%;"><span style="color:#ff6b6b; font-size: 56px;">${product.name}</span><br><span style="font-size: 76px; color: #111;">${product.price}円</span></div>`;
             speakWithWebSpeech(speakText);
           } else {
-            resultDiv.innerHTML = `<span style="color:#ff6b6b; font-size: 26px;">あれれ、みつからないよ</span><br><br><span style="font-size: 18px; color: #555;">よみとったデータ:<br>${qrData}</span>`;
+            resultDiv.innerHTML = `<div style="width: 100%;"><span style="color:#ff6b6b; font-size: 42px;">あれれ！<br>みつからないよ</span><br><span style="font-size: 24px; color: #666; display:block; margin-top:10px;">データ: ${qrData}</span></div>`;
             speakWithWebSpeech("あれれ？みつからないよ");
             setTimeout(() => { isScanning = true; }, 3500); 
           }
