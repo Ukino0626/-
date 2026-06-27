@@ -2,44 +2,108 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>レジごっこ (カメラ拡大版)</title>
+  <title>レジごっこ (巨大ボタン版)</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
-    body { font-family: sans-serif; text-align: center; background-color: #f7f9fa; margin: 0; padding: 20px; }
-    h1 { color: #ff6b6b; font-size: 24px; }
+    /* 画面全体の配置をスマホに最適化 */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background-color: #f7f9fa;
+      font-family: sans-serif;
+      overflow: hidden; /* スクロールを禁止してレジ画面を固定 */
+    }
     
-    /* 📺 カメラを囲む枠のサイズを大きくしました（最大 550px まで拡大） */
+    /* 上半分のコンテンツエリア */
+    .top-container {
+      height: 50%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      box-sizing: border-box;
+      padding: 10px;
+    }
+
+    h1 { 
+      color: #ff6b6b; 
+      font-size: 22px; 
+      margin: 0 0 10px 0; 
+    }
+    
     #preview-container { 
       position: relative; 
-      width: 95%; 
-      max-width: 550px; 
-      margin: 0 auto; 
+      width: 90%; 
+      max-width: 500px; 
+      height: 65%; /* 上半分のスペースに収まるよう調整 */
       border: 5px solid #ffcbd1; 
       border-radius: 12px; 
       overflow: hidden; 
       background: #000;
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
-    video { width: 100%; display: block; }
+    video { 
+      width: 100%; 
+      height: 100%; 
+      object-fit: cover; /* 枠いっぱいにカメラ映像を広げる */
+    }
     
-    #result { margin-top: 20px; font-size: 28px; font-weight: bold; color: #333; min-height: 80px; }
-    .btn { background-color: #ff6b6b; color: white; border: none; padding: 14px 28px; font-size: 18px; border-radius: 25px; cursor: pointer; margin-top: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    /* 🍏 結果表示エリア（ボタンが消えた後はここが下半分に広がります） */
+    #result { 
+      height: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 32px; 
+      font-weight: bold; 
+      color: #333; 
+      background-color: #ffffff;
+      border-top: 2px dashed #ffcbd1;
+      box-sizing: border-box;
+      padding: 20px;
+      text-align: center;
+    }
+
+    /* 🚨【ここが主役】下半分をすべて埋め尽くす巨大ボタン */
+    .huge-btn {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 50%; /* 画面の下半分ぴったり（50%） */
+      background-color: #ff6b6b; 
+      color: white; 
+      border: none; 
+      font-size: 28px; 
+      font-weight: bold;
+      cursor: pointer; 
+      box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
+      z-index: 100; /* 一番手前に表示 */
+      transition: background-color 0.2s;
+    }
+    .huge-btn:active {
+      background-color: #fa5252; /* タップした瞬間に少し色が変わる */
+    }
   </style>
 </head>
 <body>
 
-  <h1>🍞 おみせやさんレジ 🍎</h1>
-  
-  <div id="preview-container">
-    <video id="video" autoplay playsinline></video>
+  <div class="top-container">
+    <h1>🍞 おみせやさんレジ 🍎</h1>
+    <div id="preview-container">
+      <video id="video" autoplay playsinline></video>
+    </div>
   </div>
 
-  <div id="result">QRコードを<br>うつしてね！</div>
-  <button class="btn" onclick="initAndStart()">カメラをスタート</button>
+  <div id="result">下のボタンを<br>おしてね！</div>
+
+  <button id="start-btn" class="huge-btn" onclick="initAndStart()">ここをおして<br>カメラをスタート！</button>
 
   <script {nonce}>
     const video = document.getElementById('video');
     const resultDiv = document.getElementById('result');
+    const startBtn = document.getElementById('start-btn');
     let isScanning = false;
     let productSheetsData = []; 
 
@@ -56,11 +120,15 @@
       if ('speechSynthesis' in window) {
         window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
       }
+      
+      // 🌟 ボタンをパッと消して、下半分を「結果表示（スキャン待ち）」エリアにする
+      startBtn.style.display = 'none';
+      resultDiv.innerHTML = "QRコードを<br>うつしてね！";
+      
       startCamera();
     }
 
     function startCamera() {
-      // 🎥 カメラの理想解像度を少し高く（1280x720）設定して、大きくしても画質が荒れないようにしました
       navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: 'environment', 
@@ -96,10 +164,10 @@
 
           if (product) {
             const speakText = `${product.name}、${product.price}円！`;
-            resultDiv.innerHTML = `<span style="color:#ff6b6b;">${product.name}</span><br>${product.price}円`;
+            resultDiv.innerHTML = `<span style="color:#ff6b6b; font-size: 38px;">${product.name}</span><br><br><span style="font-size: 45px; color: #333;">${product.price}円</span>`;
             speakWithWebSpeech(speakText);
           } else {
-            resultDiv.innerHTML = `<span style="color:#ff6b6b;">あれれ、みつからないよ</span><br><br><span style="font-size: 18px; color: #555;">読み取ったデータ:<br>${qrData}</span>`;
+            resultDiv.innerHTML = `<span style="color:#ff6b6b; font-size: 26px;">あれれ、みつからないよ</span><br><br><span style="font-size: 18px; color: #555;">よみとったデータ:<br>${qrData}</span>`;
             speakWithWebSpeech("あれれ？みつからないよ");
             setTimeout(() => { isScanning = true; }, 3500); 
           }
