@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>レジごっこ (JSONデータ版)</title>
+  <title>レジごっこ (声の選択版)</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
     body { font-family: sans-serif; text-align: center; background-color: #f7f9fa; margin: 0; padding: 20px; }
@@ -11,6 +11,9 @@
     video { width: 100%; display: block; }
     #result { margin-top: 20px; font-size: 28px; font-weight: bold; color: #333; min-height: 80px; }
     .btn { background-color: #ff6b6b; color: white; border: none; padding: 12px 24px; font-size: 18px; border-radius: 25px; cursor: pointer; margin-top: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    /* 声選択メニューのスタイル */
+    #voice-select-container { margin: 15px 0; }
+    select { padding: 8px 12px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc; max-width: 80%; }
   </style>
 </head>
 <body>
@@ -22,13 +25,55 @@
   </div>
 
   <div id="result">QRコードを<br>うつしてね！</div>
+
+  <div id="voice-select-container">
+    <label for="voice-select" style="font-size: 14px; color: #666; display: block; margin-bottom: 5px;">🗣️ レジの「こえ」をえらぶ:</label>
+    <select id="voice-select"><option value="">端末の標準の音声</option></select>
+  </div>
+
   <button class="btn" onclick="initAndStart()">カメラをスタート</button>
 
   <script>
     const video = document.getElementById('video');
     const resultDiv = document.getElementById('result');
+    const voiceSelect = document.getElementById('voice-select');
     let isScanning = false;
     let productSheetsData = []; 
+
+    // 🔊 スマホに搭載されている「声のリスト」を読み込んでメニューにセットする
+    function populateVoiceList() {
+      if (!('speechSynthesis' in window)) return;
+      
+      // 日本語(ja-JP)の声だけを抜き出す
+      const voices = window.speechSynthesis.getVoices().filter(voice => voice.lang.includes('ja'));
+      
+      // メニューをリセットして追加
+      voiceSelect.innerHTML = '';
+      
+      if (voices.length === 0) {
+        voiceSelect.innerHTML = '<option value="">標準の音声 (日本語が見つかりません)</option>';
+        return;
+      }
+
+      voices.forEach((voice, index) => {
+        const option = document.createElement('option');
+        option.textContent = `${voice.name} (${voice.lang})`;
+        option.value = voice.name;
+        // 「Kyoko」や「Siri」など、標準っぽいのをはじめに選ばれやすくする
+        if (voice.name.includes('Kyoko') || voice.name.includes('Siri')) {
+          option.selected = true;
+        }
+        voiceSelect.appendChild(option);
+      });
+    }
+
+    // 音声リストの読み込み（ブラウザによってタイミングが異なるため両方でケア）
+    if ('speechSynthesis' in window) {
+      populateVoiceList();
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = populateVoiceList;
+      }
+    }
 
     async function loadJsonData() {
       try {
@@ -79,10 +124,9 @@
             resultDiv.innerHTML = `<span style="color:#ff6b6b;">${product.name}</span><br>${product.price}円`;
             speakWithWebSpeech(speakText);
           } else {
-            // 見つからない場合の表示を変更
             resultDiv.innerHTML = `<span style="color:#ff6b6b;">あれれ、みつからないよ</span><br><br><span style="font-size: 18px; color: #555;">読み取ったデータ:<br>${qrData}</span>`;
             speakWithWebSpeech("あれれ？みつからないよ");
-            setTimeout(() => { isScanning = true; }, 3500); // 3.5秒後にスキャン再開（読み取ったデータが見れるように長めに設定）
+            setTimeout(() => { isScanning = true; }, 3500); 
           }
         }
       }
@@ -93,7 +137,22 @@
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ja-JP'; utterance.rate = 1.0; utterance.pitch = 1.1;
+        utterance.lang = 'ja-JP'; 
+        
+        // ⚙️ ピッチ（高さ）と速度を調整して「よりかわいい声」のベースを作る
+        utterance.rate = 1.05; // ほんの少し早口にして可愛く
+        utterance.pitch = 1.25; // 声の高さを少し高めに設定（1.0が標準、2.0が最高）
+
+        // 🗣️ メニューで選択された「声」を適用する
+        const selectedVoiceName = voiceSelect.value;
+        if (selectedVoiceName) {
+          const voices = window.speechSynthesis.getVoices();
+          const selectedVoice = voices.find(v => v.name === selectedVoiceName);
+          if (selectedVoice) {
+            utterance.voice = selectedVoice;
+          }
+        }
+
         utterance.onend = () => {
           setTimeout(() => { resultDiv.innerHTML = "つぎのQRコードを<br>うつしてね！"; isScanning = true; requestAnimationFrame(tick); }, 1500);
         };
