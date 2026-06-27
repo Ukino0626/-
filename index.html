@@ -21,19 +21,18 @@
     <video id="video" autoplay playsinline></video>
   </div>
 
-  <div id="result">QRコードを<br>ううつしてね！</div>
+  <div id="result">QRコードを<br>うつしてね！</div>
   <button class="btn" onclick="initAndStart()">カメラをスタート</button>
 
   <script>
     const video = document.getElementById('video');
     const resultDiv = document.getElementById('result');
     let isScanning = false;
-    let productSheetsData = []; // ここにJSONから読み込んだデータを入れます
+    let productSheetsData = []; 
 
-    // 🌐 ページが開いた瞬間に、同じフォルダにある products.json を読み込む
     async function loadJsonData() {
       try {
-        const response = await fetch('./products.json'); // 同じ場所のJSONファイルを指定
+        const response = await fetch('./products.json'); 
         productSheetsData = await response.json();
         console.log("データの読み込みが完了しました！", productSheetsData);
       } catch (error) {
@@ -73,7 +72,6 @@
           const qrData = code.data.trim();
           resultDiv.innerHTML = "さがしています...";
 
-          // JSONから読み込んだデータの中から、QRのIDを探す
           const product = productSheetsData.find(p => p.id === qrData);
 
           if (product) {
@@ -81,9 +79,10 @@
             resultDiv.innerHTML = `<span style="color:#ff6b6b;">${product.name}</span><br>${product.price}円`;
             speakWithWebSpeech(speakText);
           } else {
-            resultDiv.innerHTML = "みつかりませんでした";
+            // 見つからない場合の表示を変更
+            resultDiv.innerHTML = `<span style="color:#ff6b6b;">あれれ、みつからないよ</span><br><br><span style="font-size: 18px; color: #555;">読み取ったデータ:<br>${qrData}</span>`;
             speakWithWebSpeech("あれれ？みつからないよ");
-            setTimeout(() => { isScanning = true; }, 2000);
+            setTimeout(() => { isScanning = true; }, 3500); // 3.5秒後にスキャン再開（読み取ったデータが見れるように長めに設定）
           }
         }
       }
@@ -104,7 +103,6 @@
       }
     }
 
-    // 画面が開いたらすぐデータ読み込みを実行
     window.onload = loadJsonData;
   </script>
 </body>
