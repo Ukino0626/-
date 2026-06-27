@@ -2,15 +2,28 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>レジごっこ (Siri最高音質版)</title>
+  <title>レジごっこ (カメラ拡大版)</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
     body { font-family: sans-serif; text-align: center; background-color: #f7f9fa; margin: 0; padding: 20px; }
     h1 { color: #ff6b6b; font-size: 24px; }
-    #preview-container { position: relative; width: 100%; max-width: 400px; margin: 0 auto; border: 4px solid #ffcbd1; border-radius: 10px; overflow: hidden; background: #000; }
+    
+    /* 📺 カメラを囲む枠のサイズを大きくしました（最大 550px まで拡大） */
+    #preview-container { 
+      position: relative; 
+      width: 95%; 
+      max-width: 550px; 
+      margin: 0 auto; 
+      border: 5px solid #ffcbd1; 
+      border-radius: 12px; 
+      overflow: hidden; 
+      background: #000;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
     video { width: 100%; display: block; }
+    
     #result { margin-top: 20px; font-size: 28px; font-weight: bold; color: #333; min-height: 80px; }
-    .btn { background-color: #ff6b6b; color: white; border: none; padding: 12px 24px; font-size: 18px; border-radius: 25px; cursor: pointer; margin-top: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .btn { background-color: #ff6b6b; color: white; border: none; padding: 14px 28px; font-size: 18px; border-radius: 25px; cursor: pointer; margin-top: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
   </style>
 </head>
 <body>
@@ -47,14 +60,22 @@
     }
 
     function startCamera() {
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false })
-        .then(stream => {
-          video.srcObject = stream;
-          video.onloadedmetadata = () => video.play();
-          isScanning = true;
-          requestAnimationFrame(tick);
-        })
-        .catch(err => { alert('カメラの起動に失敗しました。'); });
+      // 🎥 カメラの理想解像度を少し高く（1280x720）設定して、大きくしても画質が荒れないようにしました
+      navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment', 
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 } 
+        }, 
+        audio: false 
+      })
+      .then(stream => {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => video.play();
+        isScanning = true;
+        requestAnimationFrame(tick);
+      })
+      .catch(err => { alert('カメラの起動に失敗しました。'); });
     }
 
     function tick() {
@@ -93,23 +114,18 @@
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ja-JP'; 
         
-        // Siriにぴったりな聞き取りやすい速度と高さ
         utterance.rate = 1.05; 
         utterance.pitch = 1.05; 
 
-        // 🌟 Siriの「高音質（Premium）」声を最優先で捕まえるロジック
         const voices = window.speechSynthesis.getVoices();
-        
-        // 1. Siriの日本語声を探す
         let siriVoice = voices.find(v => v.lang.includes('ja') && v.name.includes('Siri'));
         
         if (siriVoice) {
           utterance.voice = siriVoice;
         } else {
-          // Chrome等でSiriがどうしても取れない場合の保険（Kyokoさんを可愛くして鳴らす）
           let backupVoice = voices.find(v => v.lang.includes('ja'));
           if (backupVoice) utterance.voice = backupVoice;
-          utterance.pitch = 1.35; // Kyokoさん用にかわいく高く
+          utterance.pitch = 1.35; 
         }
 
         utterance.onend = () => {
