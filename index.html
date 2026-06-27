@@ -2,179 +2,124 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>レジごっこ</title>
+  <title>レジごっこ (GitHub版)</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      background-color: #f7f9fa;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 {
-      color: #ff6b6b;
-      font-size: 24px;
-    }
-    #preview-container {
-      position: relative;
-      width: 100%;
-      max-width: 400px;
-      margin: 0 auto;
-      border: 4px solid #ffcbd1;
-      border-radius: 10px;
-      overflow: hidden;
-      background: #000;
-    }
-    video {
-      width: 100%;
-      display: block;
-    }
-    #result {
-      margin-top: 20px;
-      font-size: 28px;
-      font-weight: bold;
-      color: #333;
-      min-height: 80px;
-    }
-    .btn {
-      background-color: #ff6b6b;
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      font-size: 18px;
-      border-radius: 25px;
-      cursor: pointer;
-      margin-top: 10px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    .btn:active {
-      transform: translateY(2px);
-    }
+    body { font-family: sans-serif; text-align: center; background-color: #f7f9fa; margin: 0; padding: 20px; }
+    h1 { color: #ff6b6b; font-size: 24px; }
+    #preview-container { position: relative; width: 100%; max-width: 400px; margin: 0 auto; border: 4px solid #ffcbd1; border-radius: 10px; overflow: hidden; background: #000; }
+    video { width: 100%; display: block; }
+    #result { margin-top: 20px; font-size: 28px; font-weight: bold; color: #333; min-height: 80px; }
+    .btn { background-color: #ff6b6b; color: white; border: none; padding: 12px 24px; font-size: 18px; border-radius: 25px; cursor: pointer; margin-top: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
   </style>
 </head>
 <body>
 
-  <h1>🍞 おみせやさんレジ 🍎</h1>
+  <h1>🍞 おみせやさんレジ (GitHub版) 🍎</h1>
   
   <div id="preview-container">
     <video id="video" autoplay playsinline></video>
   </div>
 
   <div id="result">QRコードを<br>うつしてね！</div>
-  
-  <!-- このボタンを押した瞬間に、ブラウザの音声機能を「許可」状態に引き込みます -->
   <button class="btn" onclick="initAndStart()">カメラをスタート</button>
 
   <script>
     const video = document.getElementById('video');
     const resultDiv = document.getElementById('result');
-    let isScanning = false; // 最初はスキャンを無効にしておき、ボタン押下で開始
+    let isScanning = false;
+    let productSheetsData = []; // スプシから取得したデータをここに保存します
 
-    // スマホのセキュリティ対策：ユーザーがボタンを押した瞬間に音声を一度「空撃ち」してロック解除する
-    function initAndStart() {
-      // 空の音声を発音させてブラウザの音声ブロックを解除
-      if ('speechSynthesis' in window) {
-        const dummyUtterance = new SpeechSynthesisUtterance('');
-        window.speechSynthesis.speak(dummyUtterance);
+    // ⚠️ここに「ステップ1」でコピーした .csv のURLを貼り付けてください！
+    const SPREADSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQf2gvrySKODbDNfUtStrIrOPtbzcMNWgOlNc06L321A6htOHQpzPi5dW-tgrML0JVll6UMLpdJHUWW/pub?gid=0&single=true&output=csv";
+
+    // 画面が開いた瞬間に、バックグラウンドでスプシのデータを読み込みます
+    async function loadSpreadsheetData() {
+      try {
+        const response = await fetch(SPREADSHEET_CSV_URL);
+        const csvText = await response.text();
+        
+        // CSVデータを扱いやすいように分解して保存
+        const rows = csvText.split("\n").map(row => row.split(","));
+        // 1行目はヘッダー(ID, 商品, 金額)なので、2行目以降をループ
+        productSheetsData = rows.slice(1).map(row => {
+          return {
+            id: row[0]?.trim(),
+            name: row[1]?.trim(),
+            price: row[2]?.trim()
+          };
+        });
+        console.log("データの読み込みが完了しました！", productSheetsData);
+      } catch (error) {
+        console.error("スプシの読み込みに失敗しました:", error);
       }
-      
-      // カメラの起動へ
+    }
+
+    function initAndStart() {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+      }
       startCamera();
     }
 
     function startCamera() {
-      const constraints = {
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        },
-        audio: false
-      };
-
-      navigator.mediaDevices.getUserMedia(constraints)
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false })
         .then(stream => {
           video.srcObject = stream;
-          video.onloadedmetadata = function(e) {
-            video.play();
-          };
-          isScanning = true; // カメラが映ったらスキャンを開始
+          video.onloadedmetadata = () => video.play();
+          isScanning = true;
           requestAnimationFrame(tick);
         })
-        .catch(err => {
-          alert('カメラが見つからないか、許可されていません。');
-          console.error(err);
-        });
+        .catch(err => { alert('カメラの起動に失敗しました。'); });
     }
 
     function tick() {
       if (video.readyState === video.HAVE_ENOUGH_DATA && isScanning) {
         const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'dontInvert',
-        });
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
 
         if (code) {
-          isScanning = false; // 連打防止のために一時停止
-          const qrData = code.data;
-          
+          isScanning = false;
+          const qrData = code.data.trim();
           resultDiv.innerHTML = "さがしています...";
 
-          // スプレッドシートからデータを取ってくるGASの関数を呼び出し
-          google.script.run
-            .withSuccessHandler(function(product) {
-              if (product) {
-                const speakText = `${product.name}、${product.price}円！`;
-                resultDiv.innerHTML = `<span style="color:#ff6b6b;">${product.name}</span><br>${product.price}円`;
-                speakWithWebSpeech(speakText);
-              } else {
-                resultDiv.innerHTML = "みつかりませんでした";
-                speakWithWebSpeech("あれれ？みつからないよ");
-                setTimeout(() => { isScanning = true; }, 2000);
-              }
-            })
-            .getProduct(qrData);
+          // ★GASを使わず、事前に読み込んだデータ(配列)からQRのIDを探す処理
+          const product = productSheetsData.find(p => p.id === qrData);
+
+          if (product) {
+            const speakText = `${product.name}、${product.price}円！`;
+            resultDiv.innerHTML = `<span style="color:#ff6b6b;">${product.name}</span><br>${product.price}円`;
+            speakWithWebSpeech(speakText);
+          } else {
+            resultDiv.innerHTML = "みつかりませんでした";
+            speakWithWebSpeech("あれれ？みつからないよ");
+            setTimeout(() => { isScanning = true; }, 2000);
+          }
         }
       }
-      if (isScanning) {
-        requestAnimationFrame(tick);
-      }
+      if (isScanning) { requestAnimationFrame(tick); }
     }
 
-    // playVoiceの代わりにブラウザ標準のSpeechSynthesisを使う関数
     function speakWithWebSpeech(text) {
       if ('speechSynthesis' in window) {
-        // 現在喋っている音声をすべて強制停止（バグ防止）
         window.speechSynthesis.cancel();
-        
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ja-JP';  // 日本語
-        utterance.rate = 1.0;      // 速度（1.0が標準）
-        utterance.pitch = 1.1;     // 声の高さ（少し高めで可愛く）
-
-        // 喋り終わったらスキャンを再開する
-        utterance.onend = function() {
-          setTimeout(() => {
-            resultDiv.innerHTML = "つぎのQRコードを<br>うつしてね！";
-            isScanning = true;
-            requestAnimationFrame(tick);
-          }, 1500);
+        utterance.lang = 'ja-JP'; utterance.rate = 1.0; utterance.pitch = 1.1;
+        utterance.onend = () => {
+          setTimeout(() => { resultDiv.innerHTML = "つぎのQRコードを<br>うつしてね！"; isScanning = true; requestAnimationFrame(tick); }, 1500);
         };
-
-        // 発話実行
         window.speechSynthesis.speak(utterance);
       } else {
-        alert('このブラウザは音声読み上げに対応していません。');
         isScanning = true;
       }
     }
+
+    // ページが開いたらすぐにスプシのデータを裏で読み込む
+    window.onload = loadSpreadsheetData;
   </script>
 </body>
 </html>
