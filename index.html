@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>音が出るレジごっこ</title>
+  <title>レジごっこ</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
     body {
@@ -55,7 +55,7 @@
 </head>
 <body>
 
-  <h1>🍞 おみせやさんレジ（おためし音が出る版） 🍎</h1>
+  <h1>🍞 おみせやさんレジ 🍎</h1>
   
   <div id="preview-container">
     <video id="video" autoplay playsinline></video>
@@ -63,60 +63,57 @@
 
   <div id="result">QRコードを<br>うつしてね！</div>
   
-  <button class="btn" onclick="startCamera()">カメラをスタート</button>
+  <!-- このボタンを押した瞬間に、ブラウザの音声機能を「許可」状態に引き込みます -->
+  <button class="btn" onclick="initAndStart()">カメラをスタート</button>
 
   <script>
     const video = document.getElementById('video');
     const resultDiv = document.getElementById('result');
-    let isScanning = false;
+    let isScanning = false; // 最初はスキャンを無効にしておき、ボタン押下で開始
 
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-
-    // お試し用の商品リスト
-    const dummyProducts = [
-      { name: "りんご", price: 120 },
-      { name: "バナナ", price: 150 },
-      { name: "メロンパン", price: 140 },
-      { name: "いちごミルク", price: 110 },
-      { name: "ポテトチップス", price: 180 },
-      { name: "おにぎり", price: 130 },
-      { name: "チョコレート", price: 200 }
-    ];
+    // スマホのセキュリティ対策：ユーザーがボタンを押した瞬間に音声を一度「空撃ち」してロック解除する
+    function initAndStart() {
+      // 空の音声を発音させてブラウザの音声ブロックを解除
+      if ('speechSynthesis' in window) {
+        const dummyUtterance = new SpeechSynthesisUtterance('');
+        window.speechSynthesis.speak(dummyUtterance);
+      }
+      
+      // カメラの起動へ
+      startCamera();
+    }
 
     function startCamera() {
-      // 最初にお音を出すための「許可」をスマホからもらうダミー音声を一瞬鳴らす
-      playVoice("レジスタート");
-
       const constraints = {
-        video: { facingMode: { ideal: 'environment' } },
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        },
         audio: false
       };
 
       navigator.mediaDevices.getUserMedia(constraints)
-        .then(stream => { successStream(stream); })
-        .catch(err => {
-          navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-            .then(stream => { successStream(stream); });
-        });
-    }
-
-    function successStream(stream) {
-      video.srcObject = stream;
-      video.setAttribute('playsinline', true);
-      video.onloadedmetadata = function(e) {
-        video.play().then(() => {
-          isScanning = true;
+        .then(stream => {
+          video.srcObject = stream;
+          video.onloadedmetadata = function(e) {
+            video.play();
+          };
+          isScanning = true; // カメラが映ったらスキャンを開始
           requestAnimationFrame(tick);
+        })
+        .catch(err => {
+          alert('カメラが見つからないか、許可されていません。');
+          console.error(err);
         });
-      };
     }
 
     function tick() {
       if (video.readyState === video.HAVE_ENOUGH_DATA && isScanning) {
+        const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        
+        const ctx = canvas.getContext('2d');
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         
@@ -125,39 +122,58 @@
         });
 
         if (code) {
-          isScanning = false;
+          isScanning = false; // 連打防止のために一時停止
+          const qrData = code.data;
           
-          const randomProduct = dummyProducts[Math.floor(Math.random() * dummyProducts.length)];
-          
-          // 画面書き換え
-          resultDiv.innerHTML = `<span style="color:#ff6b6b;">${randomProduct.name}</span><br>${randomProduct.price}円`;
-          
-          // 音声を再生
-          const text = `${randomProduct.name}、${randomProduct.price}えん`;
-          playVoice(text);
+          resultDiv.innerHTML = "さがしています...";
+
+          // スプレッドシートからデータを取ってくるGASの関数を呼び出し
+          google.script.run
+            .withSuccessHandler(function(product) {
+              if (product) {
+                const speakText = `${product.name}、${product.price}円！`;
+                resultDiv.innerHTML = `<span style="color:#ff6b6b;">${product.name}</span><br>${product.price}円`;
+                speakWithWebSpeech(speakText);
+              } else {
+                resultDiv.innerHTML = "みつかりませんでした";
+                speakWithWebSpeech("あれれ？みつからないよ");
+                setTimeout(() => { isScanning = true; }, 2000);
+              }
+            })
+            .getProduct(qrData);
         }
       }
-      requestAnimationFrame(tick);
+      if (isScanning) {
+        requestAnimationFrame(tick);
+      }
     }
 
-    // Googleの音声データを使って直接音楽として再生する関数
-    function playVoice(text) {
-      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ja&client=tw-ob`;
-      const audio = new Audio(audioUrl);
-      
-      audio.play().then(() => {
-        // 音声が終わったら次のスキャンへ
-        audio.onended = function() {
+    // playVoiceの代わりにブラウザ標準のSpeechSynthesisを使う関数
+    function speakWithWebSpeech(text) {
+      if ('speechSynthesis' in window) {
+        // 現在喋っている音声をすべて強制停止（バグ防止）
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ja-JP';  // 日本語
+        utterance.rate = 1.0;      // 速度（1.0が標準）
+        utterance.pitch = 1.1;     // 声の高さ（少し高めで可愛く）
+
+        // 喋り終わったらスキャンを再開する
+        utterance.onend = function() {
           setTimeout(() => {
             resultDiv.innerHTML = "つぎのQRコードを<br>うつしてね！";
             isScanning = true;
-          }, 1000);
+            requestAnimationFrame(tick);
+          }, 1500);
         };
-      }).catch(err => {
-        console.error("再生失敗:", err);
-        // 万が一エラーでも次へ進める
-        setTimeout(() => { isScanning = true; }, 2000);
-      });
+
+        // 発話実行
+        window.speechSynthesis.speak(utterance);
+      } else {
+        alert('このブラウザは音声読み上げに対応していません。');
+        isScanning = true;
+      }
     }
   </script>
 </body>
