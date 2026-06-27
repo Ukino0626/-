@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>レジごっこ (おまかせ美声版)</title>
+  <title>レジごっこ (Siri最高音質版)</title>
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
     body { font-family: sans-serif; text-align: center; background-color: #f7f9fa; margin: 0; padding: 20px; }
@@ -24,7 +24,7 @@
   <div id="result">QRコードを<br>うつしてね！</div>
   <button class="btn" onclick="initAndStart()">カメラをスタート</button>
 
-  <script>
+  <script {nonce}>
     const video = document.getElementById('video');
     const resultDiv = document.getElementById('result');
     let isScanning = false;
@@ -34,7 +34,6 @@
       try {
         const response = await fetch('./products.json'); 
         productSheetsData = await response.json();
-        console.log("データの読み込みが完了しました！", productSheetsData);
       } catch (error) {
         console.error("JSONファイルの読み込みに失敗しました:", error);
       }
@@ -94,32 +93,23 @@
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'ja-JP'; 
         
-        // 🛠️ ChromeでもKyokoさんの声を最大限「アニメ声・レジ音声っぽく」する魔法のチューニング
-        utterance.rate = 1.1;   // スピードを1.1倍（少しテンポよく）
-        utterance.pitch = 1.4;  // 声の高さを1.4に（標準は1.0。高めに設定して幼いかわいい声にします）
+        // Siriにぴったりな聞き取りやすい速度と高さ
+        utterance.rate = 1.05; 
+        utterance.pitch = 1.05; 
 
-        // 🧠 自動声選びシステム（SafariならSiriや拡張音声を、Chromeなら利用可能なベストな声を選択）
+        // 🌟 Siriの「高音質（Premium）」声を最優先で捕まえるロジック
         const voices = window.speechSynthesis.getVoices();
         
-        // 1順目：よりリアルな「Siri」の声を探す
-        let targetVoice = voices.find(v => v.lang.includes('ja') && v.name.includes('Siri'));
+        // 1. Siriの日本語声を探す
+        let siriVoice = voices.find(v => v.lang.includes('ja') && v.name.includes('Siri'));
         
-        // 2順目：Siriがいなければ「Kyoko (Premium/拡張)」などの高音質版を探す
-        if (!targetVoice) {
-          targetVoice = voices.find(v => v.lang.includes('ja') && (v.name.includes('Premium') || v.name.includes('拡張')));
-        }
-        
-        // 3順目：どれもいなければ、今ある日本語音声（ChromeならKyokoさん）
-        if (!targetVoice) {
-          targetVoice = voices.find(v => v.lang.includes('ja'));
-        }
-
-        if (targetVoice) {
-          utterance.voice = targetVoice;
-          // もしSiriの声が選べた場合は、ピッチが高すぎると変になるのでマイルドに調整
-          if (targetVoice.name.includes('Siri')) {
-            utterance.pitch = 1.1; 
-          }
+        if (siriVoice) {
+          utterance.voice = siriVoice;
+        } else {
+          // Chrome等でSiriがどうしても取れない場合の保険（Kyokoさんを可愛くして鳴らす）
+          let backupVoice = voices.find(v => v.lang.includes('ja'));
+          if (backupVoice) utterance.voice = backupVoice;
+          utterance.pitch = 1.35; // Kyokoさん用にかわいく高く
         }
 
         utterance.onend = () => {
